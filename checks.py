@@ -273,16 +273,22 @@ def check_structured_data(session, base_url, home_html, timeout, products=None):
         else:
             details.append(f"Product page fetch failed: {product_url}")
 
-    has_product_schema = "Product" in product_types
+    has_product = "Product" in product_types
+    has_product_group = "ProductGroup" in product_types
     has_org = any(t in ("Organization", "Store", "WebSite") for t in home_types)
 
-    if has_product_schema:
+    if has_product:
         return CheckResult("structured data", "pass", 100,
                            "schema.org Product markup present on product pages", details)
-    if has_org or home_types:
+    if has_product_group:
+        return CheckResult(
+            "structured data", "pass", 90,
+            "Product pages use schema.org ProductGroup (newer type; older agent "
+            "parsers looking for Product may miss it)", details)
+    if has_org or home_types or product_types:
         return CheckResult("structured data", "warn", 45,
-                           "Some schema.org markup, but no Product type found on "
-                           "the sampled product page", details)
+                           "Some schema.org markup, but no Product/ProductGroup "
+                           "type on the sampled product page", details)
     return CheckResult("structured data", "fail", 0,
                        "No schema.org JSON-LD markup detected",
                        details + ["Agents rely on structured data to extract price, "
