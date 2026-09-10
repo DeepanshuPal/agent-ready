@@ -1,0 +1,38 @@
+
+agent-ready report: https://www.tentree.com
+platform: Shopify   score: 70/100 (C)   audited in 3.0s
+------------------------------------------------------------------------
+[PASS] robots.txt         100/100  No AI shopping agents blocked in robots.txt
+       - 1 sitemap(s) declared
+       - First sitemap: https://www.tentree.com/sitemap.xml
+[PASS] llms.txt           100/100  llms.txt present (88 lines of agent-facing docs)
+       - https://www.tentree.com/llms.txt
+[PASS] products.json      100/100  Machine-readable catalog exposed: 250 products, 100% with descriptions, 100% of variants priced
+       - 250 products in first page (limit=250), 998 variants
+       - description coverage: 100%
+       - image coverage: 100%
+       - vendor coverage: 100%
+       - variant price coverage: 100%
+       - variant SKU coverage: 100%
+       - variant availability flags: 100%
+       - sample product: Rambler Fleck Sweater (5 variants)
+[FAIL] structured data      0/100  No schema.org JSON-LD markup detected
+       - Homepage JSON-LD types: none
+       - Product page (https://www.tentree.com/products/rambler-fleck-sweater-harbour-grey-heather-fleck) JSON-LD types: none
+       - Agents rely on structured data to extract price, availability and identity. Without it they fall back to fragile scraping.
+[PASS] checkout handoff   100/100  Agent can read cart state and hand off to checkout via deep links
+       - /cart.js returns live cart state as JSON (Shopify AJAX API open)
+       - Deep-link add-to-cart works (/cart/46195203440826:1 -> cart page)
+[FAIL] page structure      30/100  Homepage parseability: 32% alt coverage, 5 landmark tags, 509 KB HTML
+       - 0 <h1> tag(s) on homepage
+       - image alt-text coverage: 32% (24/74)
+       - semantic landmarks: footer, header, main, nav, section
+       - 86 <script> tags, 509 KB of HTML, ~6194 chars of visible text
+       - Missing <h1> - agents lose the primary page topic
+       - Low alt-text coverage hurts vision-capable agents
+       - Very low text-to-markup ratio (1.2%) - page is mostly code, costly for context windows
+------------------------------------------------------------------------
+top fixes, in order of leverage:
+  1. Add schema.org Product JSON-LD (name, price, currency, availability) to every product page.
+  2. Clean up homepage semantics: one <h1>, alt text on images, landmark tags, less markup per byte of content.
+

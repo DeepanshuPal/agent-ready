@@ -1,0 +1,30 @@
+
+agent-ready report: https://www.allbirds.com
+platform: Shopify   score: 96/100 (A)   audited in 2.9s
+------------------------------------------------------------------------
+[PASS] robots.txt         100/100  No AI shopping agents blocked in robots.txt
+       - 1 sitemap(s) declared
+       - First sitemap: https://www.allbirds.com/sitemap.xml
+[PASS] llms.txt           100/100  llms.txt present (87 lines of agent-facing docs)
+       - https://www.allbirds.com/llms.txt
+[PASS] products.json      100/100  Machine-readable catalog exposed: 250 products, 100% with descriptions, 100% of variants priced
+       - 250 products in first page (limit=250), 2525 variants
+       - description coverage: 100%
+       - image coverage: 100%
+       - vendor coverage: 100%
+       - variant price coverage: 100%
+       - variant SKU coverage: 100%
+       - variant availability flags: 100%
+       - sample product: Free Returns Coverage (2 variants)
+[PASS] structured data     90/100  Product pages use schema.org ProductGroup (newer type; older agent parsers looking for Product may miss it)
+       - Homepage JSON-LD types: none
+       - Product page (https://www.allbirds.com/products/free-returns-coverage) JSON-LD types: ProductGroup
+[PASS] checkout handoff   100/100  Agent can read cart state and hand off to checkout via deep links
+       - /cart.js returns live cart state as JSON (Shopify AJAX API open)
+       - Deep-link add-to-cart works (/cart/42436493115472:1 -> cart page)
+[PASS] page structure      90/100  Homepage parseability: 62% alt coverage, 5 landmark tags, 655 KB HTML
+       - 1 <h1> tag(s) on homepage
+       - image alt-text coverage: 62% (26/42)
+       - semantic landmarks: footer, header, main, nav, section
+       - 63 <script> tags, 655 KB of HTML, ~91132 chars of visible text
+

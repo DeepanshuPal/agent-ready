@@ -1,0 +1,31 @@
+
+agent-ready report: https://www.gymshark.com
+platform: Shopify   score: 31/100 (F)   audited in 2.2s
+------------------------------------------------------------------------
+[PASS] robots.txt         100/100  No AI shopping agents blocked in robots.txt
+       - 3 sitemap(s) declared
+       - First sitemap: https://www.gymshark.com/sitemap.xml
+[FAIL] llms.txt             0/100  No llms.txt - agents get no curated map of the store
+       - llms.txt is the emerging convention for telling LLM agents what a site offers and where things live. Cheap to add, increasingly expected.
+[FAIL] products.json        0/100  products.json not available (HTTP 403)
+       - The Shopify products.json feed is the fastest structured product source an agent can use. If this store is on Shopify, the feed may be disabled or the storefront is headless.
+[WARN] structured data     45/100  Some schema.org markup, but no Product/ProductGroup type on the sampled product page
+       - Homepage JSON-LD types: Organization, WebSite
+[FAIL] checkout handoff     0/100  Checkout handoff is limited - agents may not be able to complete purchases
+       - /cart.js unavailable (HTTP 404)
+       - No variant id available to test deep-link add-to-cart
+[FAIL] page structure      45/100  Homepage parseability: 33% alt coverage, 6 landmark tags, 1658 KB HTML
+       - 2 <h1> tag(s) on homepage
+       - image alt-text coverage: 33% (79/241)
+       - semantic landmarks: article, footer, header, main, nav, section
+       - 17 <script> tags, 1658 KB of HTML, ~14544 chars of visible text
+       - Low alt-text coverage hurts vision-capable agents
+       - Very low text-to-markup ratio (0.9%) - page is mostly code, costly for context windows
+------------------------------------------------------------------------
+top fixes, in order of leverage:
+  1. Expose a machine-readable catalog (Shopify products.json, a Google Merchant feed, or a /products API).
+  2. Add schema.org Product JSON-LD (name, price, currency, availability) to every product page.
+  3. Publish /llms.txt describing the store, catalog endpoints and policies in plain markdown.
+  4. Make checkout handoff deterministic: a deep link or API that drops a chosen variant into a cart an agent can hand to a human.
+  5. Clean up homepage semantics: one <h1>, alt text on images, landmark tags, less markup per byte of content.
+
