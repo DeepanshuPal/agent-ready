@@ -79,6 +79,12 @@ Interesting spread in practice: Allbirds and tentree both publish `llms.txt`
 already; Gymshark 403s its own `products.json` for scripted clients, which
 means most shopping agents can't see its catalog at all.
 
+## Real runs
+
+- [50 DTC stores, 2026-09-10](audits/2026-09-10-dtc-50/) - full ranked
+  results, headline numbers, and the findings worth reading (including one
+  store whose llms.txt tries to prompt-inject AI readers).
+
 ## Roadmap
 
 - Google Merchant Center feed linting (when a store has no products.json)
