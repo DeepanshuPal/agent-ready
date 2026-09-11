@@ -41,6 +41,21 @@ python3 agent_ready.py https://www.gymshark.com --json
 
 Requires Python 3.9+ and `requests`. No other dependencies.
 
+## Bulk mode
+
+Audit a whole list of stores and get one ranked report:
+
+```bash
+# stores.txt: one store URL per line (# comments and blank lines ok)
+python3 agent_ready.py --bulk stores.txt --out audits/run-1/results --workers 5
+```
+
+Stores are audited in parallel; one broken or unreachable store is recorded
+as an error row and does not kill the batch. Output is a CSV (one row per
+store: rank, score, grade, per-check scores, top fix) plus a JSON report with
+the same rows and batch aggregates (median/mean score, audited vs failed
+counts). This is how the [50-store run](audits/2026-09-10-dtc-50/) was produced.
+
 ## Sample output
 
 Against `gymshark.com` (full output in [`examples/`](examples/)):
@@ -88,7 +103,7 @@ means most shopping agents can't see its catalog at all.
 ## Roadmap
 
 - Google Merchant Center feed linting (when a store has no products.json)
-- bulk mode: audit a list of stores, emit one CSV/JSON report
+- ~~bulk mode: audit a list of stores, emit one CSV/JSON report~~ shipped 2026-09-12
 - UCP/ACP checkout-protocol probes
 - non-Shopify platform depth (Magento, WooCommerce, custom headless)
 

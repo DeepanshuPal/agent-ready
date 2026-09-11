@@ -3,17 +3,23 @@
 
 Usage:
     python3 agent_ready.py <store-url> [--json] [--timeout SECONDS]
+    python3 agent_ready.py --bulk stores.txt [--out report] [--workers 5]
 
 Example:
     python3 agent_ready.py https://allbirds.com
+    python3 agent_ready.py --bulk stores.txt --out audits/2026-09-12/results
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from statistics import median
 
 import requests
 
@@ -114,6 +120,122 @@ def audit(url: str, timeout: int = 20) -> dict:
     }
 
 
+CHECK_ORDER = ["robots.txt", "llms.txt", "products.json", "structured data",
+               "checkout handoff", "page structure"]
+
+
+def read_store_list(path: str) -> list[str]:
+    """One store URL per line; blank lines and # comments ignored."""
+    urls = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                urls.append(line)
+    return urls
+
+
+def audit_safe(url: str, timeout: int) -> dict:
+    """audit() that never raises - one broken store must not kill a batch."""
+    try:
+        return audit(url, timeout=timeout)
+    except requests.RequestException as exc:
+        return {"url": url, "error": str(exc)}
+    except Exception as exc:
+        return {"url": url, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def bulk_report(reports: list[dict]) -> dict:
+    """Turn per-store audit dicts into one ranked, aggregate report."""
+    rows = []
+    for rep in reports:
+        if "error" in rep:
+            rows.append({"store": rep["url"], "error": rep["error"]})
+            continue
+        row = {
+            "store": rep["url"],
+            "platform": rep["platform"],
+            "score": rep["score"],
+            "grade": rep["grade"],
+            "top_fix": rep["recommendations"][0] if rep["recommendations"] else "",
+            "elapsed_seconds": rep["elapsed_seconds"],
+        }
+        for c in rep["checks"]:
+            row[c["name"]] = c["score"]
+        rows.append(row)
+
+    ok = sorted((r for r in rows if "score" in r), key=lambda r: r["score"], reverse=True)
+    for i, r in enumerate(ok, 1):
+        r["rank"] = i
+    failed = [r for r in rows if "score" not in r]
+
+    scores = [r["score"] for r in ok]
+    return {
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "stores_requested": len(reports),
+        "audited": len(ok),
+        "failed": len(failed),
+        "median_score": round(median(scores), 1) if scores else None,
+        "mean_score": round(sum(scores) / len(scores), 1) if scores else None,
+        "stores": ok + failed,
+    }
+
+
+def write_bulk_outputs(report: dict, out_prefix: str) -> tuple[str, str]:
+    csv_path = out_prefix + ".csv"
+    json_path = out_prefix + ".json"
+
+    fieldnames = ["rank", "store", "platform", "score", "grade"] + CHECK_ORDER + [
+        "top_fix", "error", "elapsed_seconds"]
+    with open(csv_path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(report["stores"])
+
+    with open(json_path, "w") as fh:
+        json.dump(report, fh, indent=2)
+
+    return csv_path, json_path
+
+
+def print_bulk_summary(report: dict) -> None:
+    print(f"\nagent-ready bulk report: {report['audited']}/{report['stores_requested']} "
+          f"stores audited, {report['failed']} failed")
+    if report["median_score"] is not None:
+        print(f"median score: {report['median_score']}   mean: {report['mean_score']}")
+    print("-" * 72)
+    print(f"{'rank':>4}  {'score':>5}  {'grade':>5}  store")
+    for row in report["stores"]:
+        if "score" in row:
+            print(f"{row['rank']:>4}  {row['score']:>5}  {row['grade']:>5}  {row['store']}")
+        else:
+            print(f"{'-':>4}  {'ERR':>5}  {'-':>5}  {row['store']}  ({row['error']})")
+    print()
+
+
+def run_bulk(path: str, out_prefix: str, workers: int, timeout: int) -> int:
+    urls = read_store_list(path)
+    if not urls:
+        print(f"error: no store URLs found in {path}", file=sys.stderr)
+        return 2
+    print(f"auditing {len(urls)} stores with {workers} workers...")
+
+    reports: list[dict] = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(audit_safe, u, timeout): u for u in urls}
+        done = 0
+        for fut in as_completed(futures):
+            reports.append(fut.result())
+            done += 1
+            print(f"  [{done}/{len(urls)}] {futures[fut]}", file=sys.stderr)
+
+    report = bulk_report(reports)
+    csv_path, json_path = write_bulk_outputs(report, out_prefix)
+    print_bulk_summary(report)
+    print(f"wrote {csv_path} and {json_path}")
+    return 0
+
+
 def print_text(report: dict) -> None:
     print(f"\nagent-ready report: {report['url']}")
     print(f"platform: {report['platform']}   "
@@ -135,11 +257,24 @@ def print_text(report: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Audit an ecommerce store for AI shopping-agent readiness.")
-    parser.add_argument("url", help="Store URL, e.g. https://allbirds.com")
+    parser.add_argument("url", nargs="?", help="Store URL, e.g. https://allbirds.com")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text")
     parser.add_argument("--timeout", type=int, default=20,
                         help="Per-request timeout in seconds (default 20)")
+    parser.add_argument("--bulk", metavar="FILE",
+                        help="Audit every store listed in FILE (one URL per line) "
+                             "and write a combined CSV + JSON report")
+    parser.add_argument("--out", default="agent-ready-bulk",
+                        help="Output prefix for --bulk reports "
+                             "(default agent-ready-bulk -> .csv and .json)")
+    parser.add_argument("--workers", type=int, default=5,
+                        help="Parallel stores for --bulk (default 5)")
     args = parser.parse_args()
+
+    if args.bulk:
+        return run_bulk(args.bulk, args.out, args.workers, args.timeout)
+    if not args.url:
+        parser.error("give a store URL, or --bulk FILE")
 
     try:
         report = audit(args.url, timeout=args.timeout)
