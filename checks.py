@@ -66,6 +66,42 @@ def normalize_url(raw: str) -> str:
 # robots.txt
 # --------------------------------------------------------------------------
 
+
+def _parse_robots_groups(text: str) -> dict[str, list[str]]:
+    """Parse robots.txt groups, preserving consecutive User-agent records.
+
+    A robots group may name several user agents before its first rule. Splitting
+    on every User-agent line loses the rules for all but the final agent.
+    """
+    groups: dict[str, list[str]] = {}
+    current_agents: list[str] = []
+    current_rules: list[str] = []
+
+    def flush() -> None:
+        if not current_agents:
+            return
+        for agent in current_agents:
+            groups.setdefault(agent, []).extend(current_rules)
+
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        field, value = (part.strip() for part in line.split(":", 1))
+        field = field.lower()
+        if field == "user-agent":
+            if current_rules:
+                flush()
+                current_agents = []
+                current_rules = []
+            current_agents.append(value.lower())
+        elif current_agents:
+            current_rules.append(f"{field}: {value}")
+
+    flush()
+    return groups
+
+
 def check_robots(session, base_url, timeout):
     resp = _get(session, base_url + "/robots.txt", timeout)
     if resp is None or resp.status_code != 200 or "user-agent" not in resp.text.lower():
@@ -76,15 +112,7 @@ def check_robots(session, base_url, timeout):
         )
 
     text = resp.text
-    groups = re.split(r"(?i)(?=^user-agent:)", text, flags=re.M)
-    agent_blocks: dict[str, list[str]] = {}
-    for group in groups:
-        lines = [l.strip() for l in group.strip().splitlines() if l.strip()]
-        uas = [l.split(":", 1)[1].strip().lower()
-               for l in lines if l.lower().startswith("user-agent:")]
-        rules = [l for l in lines if not l.lower().startswith("user-agent:")]
-        for ua in uas:
-            agent_blocks.setdefault(ua, []).extend(rules)
+    agent_blocks = _parse_robots_groups(text)
 
     blocked, allowed = [], []
     for bot in AI_USER_AGENTS:
