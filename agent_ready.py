@@ -20,6 +20,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from statistics import median
+from urllib.parse import urlparse
 
 import requests
 
@@ -92,10 +93,16 @@ def audit(url: str, timeout: int = 20) -> dict:
     home_html = home.text
     platform = detect_platform(home_html, home.headers)
 
+    # Root-level files (robots.txt, llms.txt, products.json) live at the origin
+    # root. If the homepage redirected (e.g. loom.fr -> /fr-fr), probe them at
+    # the root, not under the redirected path.
+    parsed = urlparse(final_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
     results: list[CheckResult] = []
-    results.append(check_robots(session, final_url, timeout))
-    results.append(check_llms_txt(session, final_url, timeout))
-    pj_result, products = check_products_json(session, final_url, timeout)
+    results.append(check_robots(session, origin, timeout))
+    results.append(check_llms_txt(session, origin, timeout))
+    pj_result, products = check_products_json(session, origin, timeout)
     results.append(pj_result)
     results.append(check_structured_data(session, final_url, home_html, timeout,
                                          products=products))
