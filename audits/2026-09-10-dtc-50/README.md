@@ -36,11 +36,13 @@ problems); the CSV carries the corrected scores:
 
 - **rasluxuryoils.com** - the tool reported "robots.txt blocks ALL
   crawlers" (81). Its robots.txt uses \r-only newlines, which broke the
-  parser. Standard Shopify file, no AI bots blocked. Corrected to 96/A.
+  parser. Standard Shopify file, no AI bots blocked. Corrected to 96/A. (Parser fixed in 1b395e8 - current code parses \r-only files correctly.)
 - **loom.fr** - the homepage redirects to /fr-fr and the checks ran under
   that path, so the tool missed root-level robots.txt and llms.txt (62).
   Both exist. Corrected to 82/B. Real gaps: no Product schema on product
-  pages, 0% image alt coverage.
+  pages, 0% image alt coverage. (Tool-side fix landed in a12022a -
+  root-level files are now probed at the origin root, and the tool
+  reproduces 82/B on its own.)
 
 ## One security observation
 
