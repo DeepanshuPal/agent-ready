@@ -591,6 +591,8 @@ CHALLENGE_MARKERS = [
     "cf-chl", "challenge-platform", "<title>just a moment", "attention required! | cloudflare",
     "_incapsula_resource", "px-captcha", "perimeterx", "captcha-delivery.com", "datadome",
     "verify you are human", "are you a robot", "checking your browser",
+    # Akamai queue/failover page served to plain HTTP clients with HTTP 200
+    "hang tight! routing", "this page will automatically refresh",
 ]
 
 
@@ -629,6 +631,13 @@ def check_agent_access(base_url, baseline_html, timeout, product_url=None, fetch
     fetch = fetch or (lambda url, ua: requests.get(url, headers={"User-Agent": ua, "Accept": "text/html,*/*"},
                                                    timeout=timeout, allow_redirects=True))
     base_len = _visible_text_len(baseline_html)
+    if looks_like_challenge(baseline_html):
+        return CheckResult(
+            "agent access", "fail", 0.0,
+            "Store serves a bot queue/challenge page to every plain HTTP fetch - "
+            "the browser baseline itself never sees the real storefront, so neither do agents",
+            ["browser-baseline fetch already hit a bot queue/challenge page (HTTP 200); "
+             "comparing agent fetches against it would prove nothing"]), []
     urls = [base_url] + ([product_url] if product_url else [])
     outcomes = {}
     observed = []

@@ -161,3 +161,31 @@ class ServerRenderedTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+AKAMAI_QUEUE = ("<html><body>Hang Tight! Routing to checkout... Sit tight We've "
+                "got our hands full at the moment but we should be up and moving shortly. "
+                "This page will automatically refresh and bring you into the website.</body></html>")
+
+
+class TestQueueBaseline(unittest.TestCase):
+    def test_queue_page_is_challenge(self):
+        from checks import looks_like_challenge
+        self.assertTrue(looks_like_challenge(AKAMAI_QUEUE))
+
+    def test_marketing_copy_not_challenge(self):
+        from checks import looks_like_challenge
+        self.assertFalse(looks_like_challenge(
+            "<html><body>Sit tight for our big sale! We have got our hands full of deals</body></html>"))
+
+    def test_degraded_baseline_fails_fast(self):
+        result, observed = check_agent_access("https://shop.example", AKAMAI_QUEUE, 5,
+                                              fetch=lambda url, ua: resp(200, AKAMAI_QUEUE))
+        self.assertEqual(result.status, "fail")
+        self.assertEqual(result.score, 0.0)
+        self.assertEqual(observed, [])
+
+    def test_agent_getting_queue_page_is_challenge_not_ok(self):
+        fetch = lambda url, ua: resp(200, AKAMAI_QUEUE) if "ChatGPT" in ua else resp(200, PAGE)
+        result, _ = check_agent_access("https://shop.example", PAGE, 5, fetch=fetch)
+        self.assertNotEqual(result.score, 100.0)
