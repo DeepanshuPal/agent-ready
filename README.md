@@ -12,14 +12,17 @@ never built for that. This tool measures how ready a store actually is.
 
 | check | weight | what it looks at |
 |---|---|---|
-| `products.json` | 25% | Is there a structured, machine-readable catalog? For Shopify stores: coverage of descriptions, images, prices, SKUs, availability flags across products and variants. |
-| structured data | 20% | schema.org JSON-LD on the homepage and a sampled product page (`Product` / `ProductGroup`, price, organization identity). |
-| `robots.txt` | 15% | Whether AI crawlers and agents (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, ...) are explicitly blocked, and whether sitemaps are declared. |
-| checkout handoff | 15% | Can an agent read cart state (`/cart.js`) and deep-link a variant into a cart (`/cart/{variant}:1`) without scraping? Probed with GET deep links in a throwaway session - the probe creates a session-scoped cart (that session cart IS the handoff mechanism) but never POSTs, never completes checkout, and never touches store state any shopper can see. |
-| page structure | 15% | Homepage parseability: single `<h1>`, image alt-text coverage, semantic landmarks, text-to-markup ratio. |
-| `llms.txt` | 10% | Whether the store publishes agent-facing docs at `/llms.txt`. |
+| `products.json` | 20% | Is there a structured, machine-readable catalog? For Shopify stores: coverage of descriptions, images, prices, SKUs, availability flags across products and variants. |
+| structured data | 16% | schema.org JSON-LD on the homepage and a sampled product page (`Product` / `ProductGroup`, price, organization identity). |
+| agent access | 14% | Fetches the homepage and a sampled product page as ChatGPT-User, Claude-User and OAI-SearchBot identify themselves, and compares each with a normal browser fetch. Flags blocks (403 and friends), bot-challenge pages, and near-empty shells. Robots rules say what a store intends; this shows what its CDN actually does. |
+| `robots.txt` | 12% | Blocked AI bots, weighted by what the block costs: shopper-driven fetchers (ChatGPT-User, Claude-User, Perplexity-User) cost the most, answer-engine indexers (OAI-SearchBot, Claude-SearchBot, PerplexityBot, Amazonbot) cost less, and model-training crawlers (GPTBot, ClaudeBot, Google-Extended, CCBot, ...) barely count - opting out of training is a fair choice for a store. Declared sitemaps earn 10 points. |
+| checkout handoff | 12% | Can an agent read cart state (`/cart.js`) and deep-link a variant into a cart (`/cart/{variant}:1`) without scraping? Probed with GET deep links in a throwaway session - the probe creates a session-scoped cart (that session cart IS the handoff mechanism) but never POSTs, never completes checkout, and never touches store state any shopper can see. |
+| page structure | 10% | Homepage parseability: single `<h1>`, image alt-text coverage, semantic landmarks, text-to-markup ratio. |
+| `llms.txt` | 7% | Whether `/llms.txt` exists as a real text file (a catch-all HTML page doesn't count), whether it has a title, a one-line summary and described links, and whether the homepage links to it (`<a>` or `<link>`) so agents don't have to guess. |
+| status codes | 5% | One GET to a made-up URL: a missing page should say 404, not 200 or a redirect home. Also flags bot challenges served as HTTP 200 and 429s without `Retry-After`. |
+| server-rendered facts | 4% | For non-Shopify or headless storefronts: are the product name and price in the HTML the server sends, or only after JavaScript runs? Skipped on Shopify stores with an open catalog feed. |
 
-Each check scores 0-100; the total is the weighted sum, graded A-F.
+Each check scores 0-100; the total is the weighted sum, graded A-F. A skipped check drops out and the other weights scale up to fill its share.
 
 ## Why this matters
 

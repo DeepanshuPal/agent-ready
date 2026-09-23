@@ -28,8 +28,12 @@ from checks import (
     AI_USER_AGENTS,
     DEFAULT_UA,
     CheckResult,
+    check_agent_access,
     check_checkout,
     check_llms_txt,
+    check_server_rendered,
+    check_status_codes,
+    find_product_url,
     check_page_structure,
     check_products_json,
     check_robots,
@@ -39,13 +43,18 @@ from checks import (
 )
 
 WEIGHTS = {
-    "products.json": 0.25,
-    "structured data": 0.20,
-    "robots.txt": 0.15,
-    "checkout handoff": 0.15,
-    "page structure": 0.15,
-    "llms.txt": 0.10,
+    "products.json": 0.20,
+    "structured data": 0.16,
+    "agent access": 0.14,
+    "robots.txt": 0.12,
+    "checkout handoff": 0.12,
+    "page structure": 0.10,
+    "llms.txt": 0.07,
+    "status codes": 0.05,
+    "server-rendered facts": 0.04,
 }
+# A check that reports "skip" (e.g. server-rendered facts on a Shopify store with
+# an open feed) drops out, and the remaining weights are scaled back up to 1.
 
 ICON = {"pass": "PASS", "warn": "WARN", "fail": "FAIL", "info": "INFO", "skip": "SKIP"}
 
@@ -75,6 +84,16 @@ def recommendations(results: list[CheckResult]) -> list[str]:
     if by_name["checkout handoff"].status != "pass":
         recs.append("Make checkout handoff deterministic: a deep link or API that "
                     "drops a chosen variant into a cart an agent can hand to a human.")
+    if by_name.get("agent access") and by_name["agent access"].status != "pass":
+        recs.append("Let AI agents' own fetchers (ChatGPT-User, Claude-User, OAI-SearchBot) "
+                    "through your CDN/bot rules - right now some get a block or challenge "
+                    "instead of the page.")
+    if by_name.get("status codes") and by_name["status codes"].status != "pass":
+        recs.append("Return real 404s for missing pages and plain 429 + Retry-After for "
+                    "rate limits, not 200 pages or hidden challenges.")
+    if by_name.get("server-rendered facts") and by_name["server-rendered facts"].status in ("warn", "fail"):
+        recs.append("Render product name and price in the HTML the server sends, "
+                    "not only after JavaScript runs.")
     if by_name["page structure"].status != "pass":
         recs.append("Clean up homepage semantics: one <h1>, alt text on images, "
                     "landmark tags, less markup per byte of content.")
@@ -101,7 +120,7 @@ def audit(url: str, timeout: int = 20) -> dict:
 
     results: list[CheckResult] = []
     results.append(check_robots(session, origin, timeout))
-    results.append(check_llms_txt(session, origin, timeout))
+    results.append(check_llms_txt(session, origin, timeout, home_html=home_html))
     pj_result, products = check_products_json(session, origin, timeout)
     results.append(pj_result)
     results.append(check_structured_data(session, final_url, home_html, timeout,
@@ -109,7 +128,19 @@ def audit(url: str, timeout: int = 20) -> dict:
     results.append(check_checkout(session, final_url, timeout, products=products))
     results.append(check_page_structure(home_html))
 
-    total = sum(WEIGHTS[r.name] * r.score for r in results)
+    product_url = None
+    if products and products[0].get("handle"):
+        product_url = origin + "/products/" + products[0]["handle"]
+    else:
+        product_url = find_product_url(origin, home_html)
+    access, observed = check_agent_access(final_url, home_html, timeout, product_url=product_url)
+    results.append(access)
+    results.append(check_status_codes(session, origin, timeout, observed=[home] + observed))
+    results.append(check_server_rendered(session, origin, home_html, timeout, platform, products))
+
+    scored = [r for r in results if r.status != "skip"]
+    wsum = sum(WEIGHTS[r.name] for r in scored)
+    total = sum(WEIGHTS[r.name] * r.score for r in scored) / wsum
     elapsed = round(time.time() - started, 1)
 
     return {
@@ -128,7 +159,8 @@ def audit(url: str, timeout: int = 20) -> dict:
 
 
 CHECK_ORDER = ["robots.txt", "llms.txt", "products.json", "structured data",
-               "checkout handoff", "page structure"]
+               "checkout handoff", "page structure", "agent access", "status codes",
+               "server-rendered facts"]
 
 
 def read_store_list(path: str) -> list[str]:
@@ -168,7 +200,7 @@ def bulk_report(reports: list[dict]) -> dict:
             "elapsed_seconds": rep["elapsed_seconds"],
         }
         for c in rep["checks"]:
-            row[c["name"]] = c["score"]
+            row[c["name"]] = c["score"] if c["status"] != "skip" else "skip"
         rows.append(row)
 
     ok = sorted((r for r in rows if "score" in r), key=lambda r: r["score"], reverse=True)

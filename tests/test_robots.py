@@ -36,9 +36,13 @@ Allow: /
 
         result = check_robots(session, "https://example.com", 5)
 
-        self.assertEqual(result.status, "warn")
-        self.assertIn("GPTBot", result.summary)
-        self.assertIn("ClaudeBot", result.summary)
+        # Both are training crawlers: each is still detected, but the opt-out
+        # costs little because shopping agents can still reach the store.
+        detail = " ".join(result.details)
+        self.assertIn("GPTBot", detail)
+        self.assertIn("ClaudeBot", detail)
+        self.assertGreaterEqual(result.score, 80)
+        self.assertNotEqual(result.status, "fail")
 
 
 if __name__ == "__main__":
