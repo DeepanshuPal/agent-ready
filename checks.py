@@ -354,9 +354,10 @@ def check_checkout(session, base_url, timeout, products=None):
             if variant_id:
                 break
     if variant_id:
-        # A GET against cart/add.js with an id is the classic deep-link checkout
-        # handoff: /cart/{id}:1 also works. We only probe with GET, never POST,
-        # so nothing is ever added to a real cart.
+        # The /cart/{id}:1 deep link is the classic checkout handoff: it builds
+        # a session-scoped cart by design. We probe with GET only, never POST,
+        # and never complete checkout - nothing touches store state any other
+        # shopper can see.
         probe = _get(session, f"{base_url}/cart/{variant_id}:1", timeout)
         if probe is not None and probe.status_code == 200:
             details.append(f"Deep-link add-to-cart works (/cart/{variant_id}:1 -> cart page)")

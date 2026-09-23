@@ -15,7 +15,7 @@ never built for that. This tool measures how ready a store actually is.
 | `products.json` | 25% | Is there a structured, machine-readable catalog? For Shopify stores: coverage of descriptions, images, prices, SKUs, availability flags across products and variants. |
 | structured data | 20% | schema.org JSON-LD on the homepage and a sampled product page (`Product` / `ProductGroup`, price, organization identity). |
 | `robots.txt` | 15% | Whether AI crawlers and agents (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, ...) are explicitly blocked, and whether sitemaps are declared. |
-| checkout handoff | 15% | Can an agent read cart state (`/cart.js`) and deep-link a variant into a cart (`/cart/{variant}:1`) without scraping? Probed with GET only - nothing is ever added to a real cart. |
+| checkout handoff | 15% | Can an agent read cart state (`/cart.js`) and deep-link a variant into a cart (`/cart/{variant}:1`) without scraping? Probed with GET deep links in a throwaway session - the probe creates a session-scoped cart (that session cart IS the handoff mechanism) but never POSTs, never completes checkout, and never touches store state any shopper can see. |
 | page structure | 15% | Homepage parseability: single `<h1>`, image alt-text coverage, semantic landmarks, text-to-markup ratio. |
 | `llms.txt` | 10% | Whether the store publishes agent-facing docs at `/llms.txt`. |
 
